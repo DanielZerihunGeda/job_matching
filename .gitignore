@@ -1,0 +1,8 @@
+#env-var
+.env
+
+.git
+
+.ipynb_checkpoints
+
+bot.session
