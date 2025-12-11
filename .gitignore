@@ -6,3 +6,7 @@
 .ipynb_checkpoints
 
 bot.session
+
+venv
+
+__pycache__
