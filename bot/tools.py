@@ -2,7 +2,7 @@ from langchain_community.document_loaders import PyPDFium2Loader, Docx2txtLoader
 import os
 import tempfile
 import re
-
+import numpy as np
 
 def pdf_loader(f_name: str, fi_bytes, *args):
     """Load PDF or DOCX files asynchronously"""
@@ -39,3 +39,38 @@ def pdf_loader(f_name: str, fi_bytes, *args):
         return text
 
     return None
+    
+
+#mock embedding
+
+def embed(text: str, dim: int = 384) -> np.ndarray:
+    import hashlib
+    
+    m = hashlib.sha256(text.encode('utf-8'))
+    
+    seed_int = int(m.hexdigest(), 16) % (2**32 -1)
+    np.random.seed(seed_int)
+    
+    embedding = np.random.rand(dim)
+    
+    return embedding
+    
+#Qdrant client upsertion
+from qdrant_client import QdrantClient, models
+
+class Qdrant:
+    
+    
+    def __init__(self, url, api_key, *args):
+        self.client = QdrantClient(url = url, api_key = api_key)
+        
+    def upsert(self, embedding: np.ndarray, user_id: int, *args) -> bool:
+        
+        if not self.client.retrieve(collection_name = "test0", ids=[user_id]):
+            upsert =self.client.upsert(collection_name = "test0", points=[models.PointStruct(id=user_id, payload={"user_id": user_id}, vector=embedding,),])
+            return True
+        else:
+            return False
+        
+
+        

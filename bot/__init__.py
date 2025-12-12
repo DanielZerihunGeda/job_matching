@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from telethon import TelegramClient, events
-from .tools import pdf_loader
+from .tools import pdf_loader, embed, Qdrant
 from io import BytesIO
 
 
@@ -16,6 +16,8 @@ class Settings(BaseSettings):
 
 settings = Settings()
 client = TelegramClient('bot', api_id=settings.tg_api_id, api_hash=settings.tg_api_hash)
+
+q_client = Qdrant(settings.q_url, settings.q_api_key)
 
 
 @client.on(events.NewMessage)
@@ -34,6 +36,21 @@ async def handler(event):
     parsed_t = pdf_loader(f_name, raw_f)
     
     print(f"######### Document Parsed Successfully \n\n")
-    await event.reply(f"Documt name : {f_name}")
+    
+    print("######## Embedding the text >>>>>>>")
+    embedding = embed(parsed_t)
+    print("####### Embedded successfully")
+    #print(f'embedding \n: {embedding.tolist()}')
+    
+    print(f"upserting to {event.sender_id} >>>>>>>>")
+    
+    res = q_client.upsert(embedding, event.sender_id)
+    
+    if res:
+        print(f"upserted successfully")
+    
+    else:
+        print("user already existed")
+    await event.reply(f"Documt name : \n\n{parsed_t[:20]}\n")
 
 
