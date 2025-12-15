@@ -17,11 +17,12 @@ class Settings(BaseSettings):
 settings = Settings()
 client = TelegramClient('bot', api_id=settings.tg_api_id, api_hash=settings.tg_api_hash)
 
+cli = TelegramClient('me', api_id=settings.tg_api_id, api_hash=settings.tg_api_hash)
+
 q_client = Qdrant(settings.q_url, settings.q_api_key)
 
 
 @client.on(events.NewMessage)
-
 async def handler(event):
 
   if event.media:
@@ -52,5 +53,9 @@ async def handler(event):
     else:
         print("user already existed")
     await event.reply(f"Documt name : \n\n{parsed_t[:20]}\n")
+    
+    mes = await cli.get_messages(entity = 'ch_link', limit=1)
+    
+    print(f"mes: {mes[0].message}")
 
 
