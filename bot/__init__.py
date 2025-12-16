@@ -1,7 +1,17 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from telethon import TelegramClient, events
-from .tools import pdf_loader, embed, Qdrant
+from .tools import pdf_loader, embed
 from io import BytesIO
+from openai import AsyncOpenAI
+from pydantic import BaseModel, Field
+
+
+class FieldValidator(BaseModel):
+
+  job_title: list[str] = Field(..., json_schema_extra={
+            "examples": [["Software Engineer", "Data Scientist"]]
+        }
+    )
 
 
 class Settings(BaseSettings):
@@ -19,7 +29,9 @@ client = TelegramClient('bot', api_id=settings.tg_api_id, api_hash=settings.tg_a
 
 cli = TelegramClient('me', api_id=settings.tg_api_id, api_hash=settings.tg_api_hash)
 
-q_client = Qdrant(settings.q_url, settings.q_api_key)
+llm_client = AsyncOpenAI(api_key = settings.grok_api_key, base_url='https://api.groq.com/openai/v1')
+
+#q_client = Qdrant(settings.q_url, settings.q_api_key)
 
 
 @client.on(events.NewMessage)
@@ -38,12 +50,13 @@ async def handler(event):
     
     print(f"######### Document Parsed Successfully \n\n")
     
-    print("######## Embedding the text >>>>>>>")
-    embedding = embed(parsed_t)
-    print("####### Embedded successfully")
+    #embedding = embed(parsed_t)
+    
     #print(f'embedding \n: {embedding.tolist()}')
     
-    print(f"upserting to {event.sender_id} >>>>>>>>")
+    
+    
+    '''
     
     res = q_client.upsert(embedding, event.sender_id)
     
@@ -52,10 +65,35 @@ async def handler(event):
     
     else:
         print("user already existed")
-    await event.reply(f"Documt name : \n\n{parsed_t[:20]}\n")
+        
+        '''
+    # Omit email contact addresses
+    res = await llm_client.responses.parse(
+    model = 'openai/gpt-oss-120b',
+    input = [
+        {"role": "system", "content": f"You are expert in analyzing and extracting users qualification/job_title for a candidate based on provided details about user's data.First analyze the users skills, educational background and experiences, Then map them into an appropriate job title such as Accounting and Finance Manager, Electrical Engineer, Software Engineer, Machine Learning Engineer and etc, a single candidate can have multiple qualification so map each of them into the appropriate category."},
+        {
+            "role": "user",
+            "content": f"{parsed_t}",
+        },
+    ],
+    temperature = 0.2,
+    #top_p = 0.85
     
-    mes = await cli.get_messages(entity = 'ch_link', limit=1)
+    text_format = FieldValidator,
+    )
     
-    print(f"mes: {mes[0].message}")
+    
+    res = res.output_parsed
+    
+    await event.reply(f"\n\n{res}\n")
+    
+    #mes = await cli.get_messages(entity = 'ch_link', limit=1)
+    
+    #print(f"mes: {mes[0].message}")
 
-
+@cli.on(events.NewMessage(chats=['SmsmaIo']))
+async def analyzer(event):
+    print("event is recieved")
+    #if event reply promptly is placeholder
+    await event.reply("Hello Dani what's up")
