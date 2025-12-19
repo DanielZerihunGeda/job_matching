@@ -4,6 +4,9 @@ from .tools import pdf_loader, embed
 from io import BytesIO
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
+import asyncpg
+import uuid 
+
 
 
 class FieldValidator(BaseModel):
@@ -26,10 +29,12 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-client = TelegramClient('bot', api_id=settings.tg_api_id, api_hash=settings.tg_api_hash)
 
+client = TelegramClient('bot', api_id=settings.tg_api_id, api_hash=settings.tg_api_hash)
 cli = TelegramClient('me', api_id=settings.tg_api_id, api_hash=settings.tg_api_hash)
 
+#Postgres url
+postres_uri = f"postgresql://postgres:[{settings.postgres_password}]@{settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}"
 llm_client = AsyncOpenAI(api_key = settings.grok_api_key, base_url='https://api.groq.com/openai/v1')
 
 #q_client = Qdrant(settings.q_url, settings.q_api_key)
@@ -87,14 +92,28 @@ async def handler(event):
     
     res = res.output_parsed
     
+    if res:
+        try:
+            await conn = asyncpg.connect(postres_uri)
+            
+            print('postgres connected')
+            query = f''' CREATE TABLE IF NOT EXISTS users(user_id)'''
+            await conn.execute(
+            '''query'''
+            )
+    
     await event.reply(f"\n\n{res}\n")
+    
+    
     
     #mes = await cli.get_messages(entity = 'ch_link', limit=1)
     
     #print(f"mes: {mes[0].message}")
 
-@cli.on(events.NewMessage(chats=['SmsmaIo']))
+@cli.on(events.NewMessage(chats=['SmsmaIo'], incoming = True))
 async def analyzer(event):
     print("event is recieved")
-    #if event reply promptly is placeholder
-    await event.reply("Hello Dani what's up")
+    #await event.reply("Hello Dani what's up")
+    await cli.send_message(entity = '@SmsmaIo', message = "message_recieved")
+
+
