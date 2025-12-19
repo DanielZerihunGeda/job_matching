@@ -36,7 +36,7 @@ def pdf_loader(f_name: str, fi_bytes, *args):
         # Clean up white-space
         text = re.sub(r"\n{2,}", "\n", text)
         text = re.sub(r"\t{2,}", "\t", text)
-        return text
+        return fi, text
 
     return None
     

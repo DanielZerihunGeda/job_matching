@@ -52,7 +52,7 @@ async def handler(event):
     print(f"\n\n######## file downloaded \n\n")
     
     print(f"#### Loading the Document ........\n\n")
-    parsed_t = pdf_loader(f_name, raw_f)
+    byte_fi, parsed_t= pdf_loader(f_name, raw_f)
     
     print(f"######### Document Parsed Successfully \n\n")
     
@@ -97,10 +97,17 @@ async def handler(event):
             await conn = asyncpg.connect(postres_uri)
             
             print('postgres connected')
-            query = f''' CREATE TABLE IF NOT EXISTS users(user_id)'''
-            await conn.execute(
-            '''query'''
-            )
+            table_q = f''' CREATE TABLE IF NOT EXISTS users(id uuid PRIMARY KEY DEFAULT get_random_uuid(),
+            user_id integer UNIQUE NOT NULL,
+            title varchar(225) NOT NULL),
+            raw_file bytea'''
+            title = ','.join(res)
+            user_id = int(event.sender_id)
+            upsert_q = f'''INSERT INTO users(user_id, title) VALUES({user_id}, {title})'''
+            await conn.execute(table_q)
+            await conn.execute(upsert_q)  
+        finally:
+            conn.close()
     
     await event.reply(f"\n\n{res}\n")
     
