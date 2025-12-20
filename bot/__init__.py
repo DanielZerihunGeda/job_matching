@@ -6,6 +6,7 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 import asyncpg
 import uuid 
+import asyncio
 
 
 JOB_LISTS = ['Economics', 'Sociology', 'Physics', 'Chemistry', 'Biology', 'Geology', 'Political Science', 'Civil Engineering', 'Mechanical Engineering', 'Chemical Engineering', 'Food Engineering' 'Construction Technology Management', 'Computer Engineering', 'Biomedical Engineering', 'Computer Science', 'Information Technology', 'Software Engineering', 'Cybersecurity', 'Data Science', 'Artificial Intelligence', 'Accounting', 'Marketing', 'Business Management', 'Graphics Designer']
@@ -123,12 +124,8 @@ async def handler(event):
       
       await conn.execute(upsert_q, user_id, res) 
       
-      rep = await conn.fetch("""SELECT user_id FROM users WHERE string_to_array(title, ',') && ARRAY['Data Science'];""")
-      print(rep)
       
-      
-
-@cli.on(events.NewMessage(chats=['testlenj', 'SmsmaIo'], incoming = True))
+@cli.on(events.NewMessage(chats=['testlenj', 'freelance_ethio', 'harmeejobs'], incoming = True))
 async def analyzer(event):
 
     print("event is recieved")
@@ -160,12 +157,26 @@ async def analyzer(event):
     pool = await get_pool()
     
     async with pool.acquire() as conn:
-       res = await conn.fetch("""
-            SELECT user_id 
-            FROM users 
-            WHERE string_to_array(title, ',') && $1;
-        """, job_title_li)
-       print(res)
+        res = await conn.fetch("""
+                SELECT user_id 
+                FROM users 
+                WHERE string_to_array(title, ',') && $1;
+            """, job_title_li)
+    fetched_li = [dict(r) for r in res]
+    
+    if fetched_li:
+        for user_dict in fetched_li:
+            user_id = user_dict['user_id']
+            try:
+                await client.forward_messages(user_id, event.message)
+                print(f'forwarded to client {user_id}')
+                await asyncio.sleep(0.1)
+            
+            except Exception as e:
+                print(f'Failed to send to user {user_id}: {e}')
+    
+    
+    
     
     
     
