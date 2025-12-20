@@ -8,6 +8,9 @@ import asyncpg
 import uuid 
 
 
+JOB_LISTS = ['Economics', 'Sociology', 'Physics', 'Chemistry', 'Biology', 'Geology', 'Political Science', 'Civil Engineering', 'Mechanical Engineering', 'Chemical Engineering', 'Food Engineering' 'Construction Technology Management', 'Computer Engineering', 'Biomedical Engineering', 'Computer Science', 'Information Technology', 'Software Engineering', 'Cybersecurity', 'Data Science', 'Artificial Intelligence', 'Accounting', 'Marketing', 'Business Management', 'Graphics Designer']
+
+MODEL = 'openai/gpt-oss-120b'
 
 class FieldValidator(BaseModel):
 
@@ -33,11 +36,27 @@ settings = Settings()
 client = TelegramClient('bot', api_id=settings.tg_api_id, api_hash=settings.tg_api_hash)
 cli = TelegramClient('me', api_id=settings.tg_api_id, api_hash=settings.tg_api_hash)
 
-#Postgres url
-postres_uri = f"postgresql://postgres:[{settings.postgres_password}]@{settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}"
-llm_client = AsyncOpenAI(api_key = settings.grok_api_key, base_url='https://api.groq.com/openai/v1')
 
-#q_client = Qdrant(settings.q_url, settings.q_api_key)
+async def llm_client(api_key: str = settings.grok_api_key, base_url: str = 'https://api.groq.com/openai/v1') -> AsyncOpenAI:
+    client = AsyncOpenAI(api_key = api_key, base_url = base_url)
+    return client
+
+pgpool = None
+
+
+async def get_pool():
+    global pgpool
+    
+    if not pgpool:
+        pgpool = await asyncpg.create_pool(host = settings.host, 
+                               port = settings.port,
+                               user = settings.user,
+                               database = settings.dbname,
+                               password = settings.password)
+                               
+    return pgpool
+    
+
 
 
 @client.on(events.NewMessage)
@@ -46,38 +65,25 @@ async def handler(event):
   if event.media:
     
     f_name = event.message.file.name
-    
     print("######### Downloading the file bytes")
     raw_f = await event.download_media(bytes)
     print(f"\n\n######## file downloaded \n\n")
     
+    
     print(f"#### Loading the Document ........\n\n")
     byte_fi, parsed_t= pdf_loader(f_name, raw_f)
     
+    
     print(f"######### Document Parsed Successfully \n\n")
     
-    #embedding = embed(parsed_t)
-    
-    #print(f'embedding \n: {embedding.tolist()}')
-    
-    
-    
-    '''
-    
-    res = q_client.upsert(embedding, event.sender_id)
-    
-    if res:
-        print(f"upserted successfully")
-    
-    else:
-        print("user already existed")
-        
-        '''
     # Omit email contact addresses
-    res = await llm_client.responses.parse(
-    model = 'openai/gpt-oss-120b',
+    _llm_client = await llm_client()
+    res = await _llm_client.responses.parse(
+    model = MODEL
+    ,
+    
     input = [
-        {"role": "system", "content": f"You are expert in analyzing and extracting users qualification/job_title for a candidate based on provided details about user's data.First analyze the users skills, educational background and experiences, Then map them into an appropriate job title such as Accounting and Finance Manager, Electrical Engineer, Software Engineer, Machine Learning Engineer and etc, a single candidate can have multiple qualification so map each of them into the appropriate category."},
+        {"role": "system", "content": f"You are expert in analyzing and extracting users qualification/job_title for a candidate based on provided details about candidates information. First analyze the users skills, educational background and experiences, Then select one or more from the given list of job titles only don't assign job title by your own select the most appropriate from the job titles.\n Job Titles: \n **{' '.join(JOB_LISTS)}**"},
         {
             "role": "user",
             "content": f"{parsed_t}",
@@ -90,37 +96,76 @@ async def handler(event):
     )
     
     
-    res = res.output_parsed
+    res = ','.join(res.output_parsed.job_title)
     
-    if res:
-        try:
-            await conn = asyncpg.connect(postres_uri)
-            
-            print('postgres connected')
-            table_q = f''' CREATE TABLE IF NOT EXISTS users(id uuid PRIMARY KEY DEFAULT get_random_uuid(),
-            user_id integer UNIQUE NOT NULL,
-            title varchar(225) NOT NULL),
-            raw_file bytea'''
-            title = ','.join(res)
-            user_id = int(event.sender_id)
-            upsert_q = f'''INSERT INTO users(user_id, title) VALUES({user_id}, {title})'''
-            await conn.execute(table_q)
-            await conn.execute(upsert_q)  
-        finally:
-            conn.close()
+    if not res:
+        return 
+    pool = await get_pool()
     
-    await event.reply(f"\n\n{res}\n")
-    
-    
-    
-    #mes = await cli.get_messages(entity = 'ch_link', limit=1)
-    
-    #print(f"mes: {mes[0].message}")
+    async with pool.acquire() as conn:
+      print('postgres connected successfully')
+      table_q = ''' CREATE TABLE IF NOT EXISTS users(
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        user_id BIGINT UNIQUE NOT NULL,
+                        title varchar(225) NOT NULL,
+                        raw_file BYTEA
+                        );'''
+                        
+      await conn.execute(table_q)
+                    
+      user_id = int(event.sender_id)
+      
+      upsert_q = '''INSERT INTO users (user_id, title)
+                    VALUES ($1, $2)
+                    ON CONFLICT (user_id) DO UPDATE
+                    SET title = EXCLUDED.title;  
+      '''
+      
+      await conn.execute(upsert_q, user_id, res) 
+      
+      rep = await conn.fetch("""SELECT user_id FROM users WHERE string_to_array(title, ',') && ARRAY['Data Science'];""")
+      print(rep)
+      
+      
 
-@cli.on(events.NewMessage(chats=['SmsmaIo'], incoming = True))
+@cli.on(events.NewMessage(chats=['testlenj', 'SmsmaIo'], incoming = True))
 async def analyzer(event):
+
     print("event is recieved")
-    #await event.reply("Hello Dani what's up")
-    await cli.send_message(entity = '@SmsmaIo', message = "message_recieved")
-
-
+    _llm_client = await llm_client()
+    res = await _llm_client.responses.parse(
+    
+            model = MODEL,
+            input = [
+                    {
+                            'role': 'system',
+                            'content': f'''You are a helpful assistant. You will analyze required 
+                            qualifications a job description then select one or more appropriate 
+                            job title from the given list of job titles. Job Titles: \n\n **{" ".join(JOB_LISTS)}**'''  
+                    },
+                    
+                    {
+                            'role': 'system',
+                            'content': f'Job Descriptions \n\n{event.message.message}'
+                    }
+            ],
+            
+            temperature = 0.2,
+            text_format = FieldValidator
+    )
+    
+    job_title_li = res.output_parsed.job_title
+    
+    print(job_title_li)
+    pool = await get_pool()
+    
+    async with pool.acquire() as conn:
+       res = await conn.fetch("""
+            SELECT user_id 
+            FROM users 
+            WHERE string_to_array(title, ',') && $1;
+        """, job_title_li)
+       print(res)
+    
+    
+    
