@@ -1,6 +1,9 @@
 from . import client, cli, settings, logger
 import asyncio
 from telethon import events
+import subprocess
+
+
 
 received_code = None
 code_event = asyncio.Event()
@@ -8,6 +11,8 @@ phone_code_hash = None
 
 @client.on(events.NewMessage(chats=['tggcodd'], incoming=True))
 async def catch_verification_code(event):
+    #checking session file at first execution:
+        
     global received_code
     print(event.message.text)
     if event.message.text and event.message.text.isdigit():
@@ -26,17 +31,36 @@ async def get_verification_code():
 async def main():
     await client.start(bot_token=settings.tg_bot_token)
     
-    await cli.connect()
+    if not cli.is_connected():
+        try:
+            await cli.connect()
+        except OSError as e:
+            logger.error(f'User client failed to connect: {e}')
+            return
+    
+    
     global phone_code_hash
-    sent_code = await cli.send_code_request(settings.phone)
-    phone_code_hash = sent_code.phone_code_hash
-    logger.info('Verification code sent. Waiting for code ...')
+    try:
+        sent_code = await cli.send_code_request(settings.phone)
+        phone_code_hash = sent_code.phone_code_hash
+        logger.info('Verification code sent. Waiting for code ...')
+    except Exception as e:
+        logger.error(f'Failed to send verification code: {e}')
+        return
     
-    code = await get_verification_code()
-    logger.info('code received')
+    try:
+        code = await asyncio.wait_for(get_verification_code(), timeout=300)  # Add 5-min timeout to prevent hangs
+        logger.info('code received')
+    except asyncio.TimeoutError:
+        logger.error('verification timeout')
+        return
     
-    await cli.sign_in(settings.phone, code, phone_code_hash=phone_code_hash)
-    logger.info('login successful!')
+    try:
+        await cli.sign_in(settings.phone, code, phone_code_hash=phone_code_hash)
+        logger.info('login successful!')
+    except Exception as e:
+        logger.error(f'error verifying code: {e}')
+        return
     
     logger.info('clients are running successfully')
     await asyncio.gather(

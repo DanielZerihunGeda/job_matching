@@ -141,8 +141,12 @@ async def get_pool():
 
 
 
-@client.on(events.NewMessage(blacklist_chats = ['tggcodd']))
+@client.on(events.NewMessage)
 async def handler(event):
+    if int(event.sender_id) == int(settings.account_id):
+        logger.info('Self account message ignored')
+        return
+
     if not event.media:
         logger.info(f"Message has no media ignoring\n\nSender_id: {event.sender_id}\n\n")
         await event.reply('Please upload or update your resume maxsize = 5mb')
@@ -278,7 +282,7 @@ async def analyzer(event):
                 try:
                     await client.forward_messages(user_id, event.message)
                     logger.info(f'forwarded to client {user_id}')
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(3)
                 
                 except Exception as e:
                     logger.warning(f'Failed to send to user {user_id}: {e}')
