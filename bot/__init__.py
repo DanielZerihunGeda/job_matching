@@ -141,16 +141,21 @@ async def get_pool():
 
 
 
-@client.on(events.NewMessage)
+@client.on(events.NewMessage(blacklist_chats = ['tggcodd']))
 async def handler(event):
     if not event.media:
-        logger.info("Message has no media ignoring")
+        logger.info(f"Message has no media ignoring\n\nSender_id: {event.sender_id}\n\n")
+        await event.reply('Please upload or update your resume maxsize = 5mb')
         return
-
     # Get file name and download
     f_name = event.message.file.name or "unknown_file.pdf"
     logger.info(f"File uploaded: {f_name}")
-
+    file_size = event.message.file.size #getting file size
+    
+    if file_size >=5*(10**6):
+        logger.info(f'File size exceed maxsize: sent from user_id: {event.sender_id} filesize: {file_size}')
+        await event.reply('You are allowed to upload max size of 5mb document')
+        return
     raw_f = await event.download_media(bytes)
     if not raw_f:
         logger.warning("Failed to download file")
@@ -282,10 +287,3 @@ async def analyzer(event):
             
     except Exception as e:
         logger.error(f"Error fetching from the database for Job Title: {','.join(job_title_li)}")
-        
-    
-    
-    
-    
-    
-    
