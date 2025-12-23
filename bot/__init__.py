@@ -198,10 +198,12 @@ async def handler(event):
         
     result = ','.join(res)
     logger.info(f"Extracted job titles: {result}")
-
+    
     try:
-        pool = await get_pool()
-        async with pool.acquire() as conn:
+        if pgpool is None:
+            pgpool = await get_pool()
+        
+        async with pgpool.acquire() as conn:
             logger.info("Postgres connected successfully")
 
             # Create table if not exists
@@ -227,9 +229,15 @@ async def handler(event):
             logger.info(f"User {user_id} information upserted successfully with titles: {res}")
             await event.reply(f"Thanks! I've analyzed your resume.\n\nBest matching job titles:\n**{res.replace(',', ' | ')}** \n\nYou will be notified, If you meet the requirements")
 
-    except Exception as e:
-        logger.error(f"Database error for user {event.sender_id}: {e}")
+    except asyncpg.ClientConfigurationError as e:
+        logger.error(f"client config error occured from {event.sender_id}: {e}")
         await event.reply("An error occurred while saving in Database.")
+    except asyncpg.PostgresError as e:
+        logger.error(f"Postgres error occured from :{event.sender_id}: {e}")
+    except asyncpg.InternalClientError as e:
+        logger.error(f"Internal client error from: {event.sender_id}: {e}")
+    except Exception as e:
+        logger.error(f"Unknown error from: {event.sender_id}: {e}")
                 
       
 @cli.on(events.NewMessage(chats=['testlenj', 'freelance_ethio', 'harmeejobs'], incoming = True))
@@ -267,8 +275,9 @@ async def analyzer(event):
     
     try:
         logger.info("Matching User with job descriptions")
-        pool = await get_pool()
-        async with pool.acquire() as conn:
+        if pgpool is None:
+            pool = await get_pool()
+        async with pgpool.acquire() as conn:
             res = await conn.fetch("""
                     SELECT user_id 
                     FROM users 
