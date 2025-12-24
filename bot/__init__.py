@@ -227,7 +227,7 @@ async def handler(event):
             """
             await conn.execute(upsert_query, user_id, result)
             logger.info(f"User {user_id} information upserted successfully with titles: {res}")
-            await event.reply(f"Thanks! I've analyzed your resume.\n\nBest matching job titles:\n**{res.replace(',', ' | ')}** \n\nYou will be notified, If you meet the requirements")
+            await event.reply(f"Thanks! I've analyzed your resume.\n\nBest matching job titles:\n**{result.replace(',', ' | ')}** \n\nYou will be notified, If you meet the requirements")
 
     except asyncpg.ClientConfigurationError as e:
         logger.error(f"client config error occured from {event.sender_id}: {e}")
