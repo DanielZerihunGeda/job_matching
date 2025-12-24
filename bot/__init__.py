@@ -201,7 +201,7 @@ async def handler(event):
     
     try:
         if pgpool is None:
-            pgpool = await get_pool()
+            await get_pool()
         
         async with pgpool.acquire() as conn:
             logger.info("Postgres connected successfully")
@@ -276,7 +276,7 @@ async def analyzer(event):
     try:
         logger.info("Matching User with job descriptions")
         if pgpool is None:
-            pool = await get_pool()
+            await get_pool()
         async with pgpool.acquire() as conn:
             res = await conn.fetch("""
                     SELECT user_id 
