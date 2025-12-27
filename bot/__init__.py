@@ -55,6 +55,14 @@ class Settings(BaseSettings):
   tg_api_hash: str
   tg_bot_token: str
   grok_api_key: str
+  host: str
+  port: int
+  user: str
+  dbname: str
+  password: str
+  account_id: int
+  account_id_o: int
+  phone: str
 
   model_config = SettingsConfigDict(env_file=".env", env_file_encoding='utf-8',
    extra = 'allow')
