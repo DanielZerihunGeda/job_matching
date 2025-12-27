@@ -8,6 +8,7 @@ import asyncpg
 import uuid 
 import asyncio
 import logging
+from telethon import functions, types
 
 
 logger = logging.getLogger('Job_Scrapping')
@@ -33,6 +34,10 @@ if not logger.handlers:
 
 
 JOB_LISTS = ['Economics', 'Sociology', 'Physics', 'Chemistry', 'Biology', 'Geology', 'Political Science', 'Civil Engineering', 'Mechanical Engineering', 'Chemical Engineering', 'Food Engineering' 'Construction Technology Management', 'Computer Engineering', 'Biomedical Engineering', 'Computer Science', 'Information Technology', 'Software Engineering', 'Cybersecurity', 'Data Science', 'Artificial Intelligence', 'Accounting', 'Marketing', 'Business Management', 'Graphics Designer']
+
+CH = ['hahujobsforfreshgraduates', 'freelance_ethio', 'harmeejobs', 
+      'hahujobs', 'ethiojobsofficial', 'effoyjobs', 'geezjobs_ethiopia',
+      'jobs_in_ethio', ]
 
 MODEL = 'openai/gpt-oss-120b'
 
@@ -143,7 +148,7 @@ async def get_pool():
 
 @client.on(events.NewMessage)
 async def handler(event):
-    if int(event.sender_id) == int(settings.account_id):
+    if int(event.sender_id) in [int(settings.account_id) , int(settings.account_id_o)]:
         logger.info('Self account message ignored')
         return
 
@@ -239,8 +244,18 @@ async def handler(event):
     except Exception as e:
         logger.error(f"Unknown error from: {event.sender_id}: {e}")
                 
+@cli.on(events.NewMessage(chats = CH, incoming = True))
+async  def forward_message(event):
+    logger.info(f"new event has arrived from {event.sender_id}")
+
+    try:
+        await cli.forward_messages('testlenj', event.message)
+        logger.info(f'forwarded to testlenj')
+    except Exception as e:
+        logger.error(f"Failed to forward message from {event.sender_id}: {e}")
+    
       
-@cli.on(events.NewMessage(chats=['testlenj', 'freelance_ethio', 'harmeejobs'], incoming = True))
+@client.on(events.NewMessage(chats=['testlenj'], incoming = True))
 async def analyzer(event):
 
     logger.info(f"new event has arrived from {event.sender_id}")
@@ -262,6 +277,13 @@ async def analyzer(event):
     res = await get_llm_response(system_message, user_message)
     if not res:
         logger.warning('llm failed to parse appropriate job title from the job description')
+
+        del_mes = await cli(functions.channels.DeleteMessagesRequest(
+                channel = 'testlenj',
+                id = [event.message.id]
+            ))
+
+        logger.info(f"Message deleted from testlenj channel: {del_mes.stringify()}")
         return
         
     job_title_li = res
@@ -295,8 +317,18 @@ async def analyzer(event):
                 
                 except Exception as e:
                     logger.warning(f'Failed to send to user {user_id}: {e}')
+
+            #Deleting messages from intermediate channel
+
         else:
             logger.info("No matching users found in database")
+        
+        del_mes = await cli(functions.channels.DeleteMessagesRequest(
+                channel = 'testlenj',
+                id = [event.message.id]
+            ))
+
+        logger.info(f"Message deleted from testlenj channel: {del_mes.stringify()}")
             
     except Exception as e:
         logger.error(f"Error fetching from the database for Job Title: {','.join(job_title_li)}")
