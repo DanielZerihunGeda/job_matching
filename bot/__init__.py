@@ -9,6 +9,8 @@ import uuid
 import asyncio
 import logging
 from telethon import functions, types
+from telethon.sessions import SQLiteSession
+
 
 
 logger = logging.getLogger('Job_Scrapping')
@@ -70,9 +72,8 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-client = TelegramClient('bot', api_id=settings.tg_api_id, api_hash=settings.tg_api_hash)
-cli = TelegramClient('me', api_id=settings.tg_api_id, api_hash=settings.tg_api_hash)
-
+client = TelegramClient(SQLiteSession('bot'), api_id=settings.tg_api_id, api_hash=settings.tg_api_hash)
+cli = TelegramClient(SQLiteSession('me'), api_id=settings.tg_api_id, api_hash=settings.tg_api_hash)
 
 async def llm_client(api_key: str = settings.grok_api_key, base_url: str = 'https://api.groq.com/openai/v1') -> AsyncOpenAI:
     client = AsyncOpenAI(api_key = api_key, base_url = base_url)
@@ -151,9 +152,6 @@ async def get_pool():
                                
     return pgpool
     
-
-
-
 @client.on(events.NewMessage)
 async def handler(event):
     if int(event.sender_id) in [int(settings.account_id) , int(settings.account_id_o)]:
@@ -330,13 +328,20 @@ async def analyzer(event):
 
         else:
             logger.info("No matching users found in database")
-        
-        del_mes = await cli(functions.channels.DeleteMessagesRequest(
+
+    except asyncpg.ClientConfigurationError as e:
+        logger.error(f"client config error occured {','.join(job_title_li)}: {e}")
+    except asyncpg.PostgresError as e:
+        logger.error(f"Postgres error occured {','.join(job_title_li)}: {e}")
+    except asyncpg.InternalClientError as e:
+        logger.error(f"Internal client error {','.join(job_title_li)}: {e}")
+    except Exception as e:
+        logger.error(f"Error fetching from the database for Job Title: {','.join(job_title_li)}")
+    
+    #Del ff'd mes
+    del_mes = await cli(functions.channels.DeleteMessagesRequest(
                 channel = 'testlenj',
                 id = [event.message.id]
             ))
 
-        logger.info(f"Message deleted from testlenj channel: {del_mes.stringify()}")
-            
-    except Exception as e:
-        logger.error(f"Error fetching from the database for Job Title: {','.join(job_title_li)}")
+    logger.info(f"Message deleted from testlenj channel: {del_mes.stringify()}")
