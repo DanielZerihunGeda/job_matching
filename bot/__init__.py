@@ -65,6 +65,7 @@ class Settings(BaseSettings):
   account_id: int
   account_id_o: int
   phone: str
+  uri: str
 
   model_config = SettingsConfigDict(env_file=".env", env_file_encoding='utf-8',
    extra = 'allow')
@@ -144,11 +145,7 @@ async def get_pool():
     global pgpool
     
     if not pgpool:
-        pgpool = await asyncpg.create_pool(host = settings.host, 
-                               port = settings.port,
-                               user = settings.user,
-                               database = settings.dbname,
-                               password = settings.password)
+        pgpool = await asyncpg.create_pool(settings.uri)
                                
     return pgpool
     
