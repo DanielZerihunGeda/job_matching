@@ -1,12 +1,26 @@
 #env-var
 .env
+.env.*
+!.env.example
 
 .git
 
 .ipynb_checkpoints
 
 bot.session
+me.session
+*.session
 
 venv
+.venv
 
 __pycache__
+*.py[cod]
+*.log
+*.sqlite
+*.db
+dist/
+build/
+coverage/
+htmlcov/
+*.ipynb
