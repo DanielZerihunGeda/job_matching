@@ -1,0 +1,137 @@
+flowchart TD
+
+    A["Incoming Candidate Graph Data"] --> B["Normalize Input"]
+
+    %% =========================
+    %% Candidate
+    %% =========================
+    B --> C{"Candidate.TelegramID<br/>EXACT match?"}
+
+    C -->|Exists| C1["Reuse Candidate"]
+    C -->|Not exists| C2["CREATE Candidate<br/>using TelegramID"]
+
+    C1 --> D["Process Related Nodes"]
+    C2 --> D
+
+    %% =========================
+    %% Skill
+    %% =========================
+    D --> S1["Skill"]
+
+    S1 --> S2["Normalize Skill.name"]
+    S2 --> S3["Compare against existing<br/>Skill.name<br/>FUZZY: Levenshtein"]
+
+    S3 --> S4{"Best score >= 0.75?"}
+
+    S4 -->|Yes| S5["Reuse matched Skill"]
+    S4 -->|No| S6["CREATE Skill"]
+
+    %% =========================
+    %% Organization
+    %% =========================
+    D --> O1["Organization"]
+
+    O1 --> O2["Normalize Organization.name"]
+    O2 --> O3["Compare against existing<br/>Organization.name<br/>FUZZY: Levenshtein"]
+
+    O3 --> O4{"Best score >= 0.75?"}
+
+    O4 -->|Yes| O5["Reuse matched Organization"]
+    O4 -->|No| O6["CREATE Organization"]
+
+    %% =========================
+    %% Certification
+    %% =========================
+    D --> CE1["Certification"]
+
+    CE1 --> CE2["Normalize<br/>Certification.name + issuer"]
+    CE2 --> CE3["Compare against existing<br/>Certification.name + issuer<br/>FUZZY: Levenshtein"]
+
+    CE3 --> CE4{"Best score >= 0.75?"}
+
+    CE4 -->|Yes| CE5["Reuse matched Certification"]
+    CE4 -->|No| CE6["CREATE Certification"]
+
+    %% =========================
+    %% Language
+    %% =========================
+    D --> L1["Language"]
+
+    L1 --> L2{"Language.isoCode<br/>available?"}
+
+    L2 -->|Yes| L3{"Language.isoCode<br/>EXACT match?"}
+    L3 -->|Exists| L4["Reuse Language"]
+    L3 -->|Not exists| L5["CREATE Language"]
+
+    L2 -->|No| L6["Normalize Language.name"]
+    L6 --> L7["Compare against existing<br/>Language.name<br/>FUZZY: Levenshtein"]
+
+    L7 --> L8{"Best score >= 0.75?"}
+    L8 -->|Yes| L4
+    L8 -->|No| L5
+
+    %% =========================
+    %% Location
+    %% =========================
+    D --> LOC1["Location"]
+
+    LOC1 --> LOC2{"city + region + countryCode<br/>available?"}
+
+    LOC2 -->|Yes| LOC3{"Location<br/>(city, region, countryCode)<br/>EXACT composite match?"}
+
+    LOC3 -->|Exists| LOC4["Reuse Location"]
+    LOC3 -->|Not exists| LOC5["CREATE Location"]
+
+    LOC2 -->|No| LOC6["Normalize available<br/>city + region + countryCode"]
+
+    LOC6 --> LOC7["Compare against existing<br/>Location composite values<br/>FUZZY: Levenshtein"]
+
+    LOC7 --> LOC8{"Best score >= 0.75?"}
+    LOC8 -->|Yes| LOC4
+    LOC8 -->|No| LOC5
+
+    %% =========================
+    %% Role
+    %% =========================
+    D --> R1["Role"]
+
+    R1 --> R2{"Role.roleId<br/>EXACT match?"}
+
+    R2 -->|Exists| R3["Reuse Role"]
+    R2 -->|Not exists| R4["CREATE Role"]
+
+    %% =========================
+    %% Project
+    %% =========================
+    D --> P1["Project"]
+
+    P1 --> P2{"Project.projectId<br/>EXACT match?"}
+
+    P2 -->|Exists| P3["Reuse Project"]
+    P2 -->|Not exists| P4["CREATE Project"]
+
+    %% =========================
+    %% Relationships
+    %% =========================
+    S5 --> REL["MERGE Relationships"]
+    S6 --> REL
+
+    O5 --> REL
+    O6 --> REL
+
+    CE5 --> REL
+    CE6 --> REL
+
+    L4 --> REL
+    L5 --> REL
+
+    LOC4 --> REL
+    LOC5 --> REL
+
+    R3 --> REL
+    R4 --> REL
+
+    P3 --> REL
+    P4 --> REL
+
+    REL --> E["Candidate Graph Ingestion Complete"]

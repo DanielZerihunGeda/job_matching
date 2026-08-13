@@ -1,0 +1,33 @@
+flowchart TD
+    A[PDF Resume]
+    --> B["PyMuPDF: Extract text spans + metadata"]
+
+    B --> C["Area Validation
+    Check text coordinates against valid page area"]
+
+    C --> D{Inside valid area?}
+
+    D -->|No| X1[Discard text span]
+    D -->|Yes| E["Visibility Validation
+    • text/background contrast
+    • opacity
+    • render mode
+    • rendered visibility"]
+
+    E --> F{Visible?}
+
+    F -->|No| X2[Discard text span]
+    F -->|Yes| G[Trusted Visible Text]
+
+    G --> H["LLM: Parse resume into structured fields"]
+
+    H --> I["Pydantic Validation
+    • schema
+    • field types
+    • required fields
+    • value constraints"]
+
+    I --> J{Valid?}
+
+    J -->|No| X3[Reject / Retry LLM Output]
+    J -->|Yes| K[Final Parsed Resume Fields]

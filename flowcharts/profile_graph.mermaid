@@ -1,0 +1,89 @@
+flowchart TD
+
+    C["Candidate
+    ─────────────
+    candidateId
+    fullName
+    email
+    phone
+    headline
+    summary"]
+
+    R["Role
+    ─────────────
+    roleId
+    title
+    description
+    employmentType
+    embedding"]
+
+    O["Organization
+    ─────────────
+    organizationId
+    name
+    entityType
+    industry
+    website"]
+
+    P["Project
+    ─────────────
+    projectId
+    name
+    projectType
+    description
+    startDate
+    endDate
+    embedding"]
+
+    S["Skill
+    ─────────────
+    skillId
+    name
+    category"]
+
+    L["Language
+    ─────────────
+    isoCode
+    name"]
+
+    LOC["Location
+    ─────────────
+    locationId
+    city
+    region
+    countryCode"]
+
+    CERT["Certification
+    ─────────────
+    certificationId
+    name
+    issuer"]
+
+    C -->|"HAS_EXPERIENCE_IN
+    { from, to, isCurrent }
+    tenureYears = derived"| R
+
+    R -->|"HAS_EXPERIENCE_AT
+    organizationTenureYears = derived"| O
+
+    C -->|"HAS_SKILL
+    { proficiency? }"| S
+
+    R -->|"USED_SKILL
+    { isPrimary? }"| S
+
+    C -->|"HAS_PROJECT_EXP"| P
+
+    P -->|"USED_SKILL
+    { isPrimary? }"| S
+
+    C -->|"SPEAKS
+    { proficiency, isNative }"| L
+
+    C -->|"LOCATED_IN"| LOC
+
+    C -->|"CERTIFIED_IN
+    { credentialId,
+      issueDate,
+      expiryDate,
+      credentialUrl }"| CERT 
