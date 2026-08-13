@@ -1,0 +1,22 @@
+flowchart TD
+    A[Resume Upload Request]
+
+    A --> B{Declared / Streamed Size<br/>Within Limit?}
+    B -->|No| R1[Reject: File Too Large]
+    B -->|Yes| C[Ignore Client Path<br/>Extract Filename + Extension Only]
+
+    C --> D{Extension Allowed?<br/>PDF / DOCX}
+    D -->|No| R2[Reject: Unsupported Type]
+    D -->|Yes| E{MIME Type Allowed?}
+
+    E -->|No| R3[Reject: Invalid MIME]
+    E -->|Yes| F{File Signature Matches<br/>Expected Format?}
+
+    F -->|No| R4[Reject: Type Mismatch]
+    F -->|Yes| G[Generate Server-Side File ID<br/>Never Trust Client Path]
+
+    G --> H[ClamAV Malware Scan]
+
+    H --> I{Malware Detected?}
+    I -->|Yes| R5[Reject + Delete Temporary File]
+    I -->|No| J[Accept Resume]
