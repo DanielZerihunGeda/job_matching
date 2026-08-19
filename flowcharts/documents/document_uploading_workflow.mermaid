@@ -15,7 +15,7 @@ flowchart TD
     F -->|No| R4[Reject: Type Mismatch]
     F -->|Yes| G[Generate Server-Side File ID<br/>Never Trust Client Path]
 
-    G --> H[ClamAV Malware Scan]
+    G --> H[ClamAV Malware Scan via Unix Socket Local]
 
     H --> I{Malware Detected?}
     I -->|Yes| R5[Reject + Delete Temporary File]
