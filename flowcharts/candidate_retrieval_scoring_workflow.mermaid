@@ -1,0 +1,74 @@
+flowchart TD
+
+    A["Candidate Search Request<br/>job description + scoreThreshold + resultLimit"]
+    --> B{"Request valid?<br/>0.0 <= scoreThreshold <= 1.0<br/>resultLimit within configured bound"}
+
+    B -->|No| X1["Reject with safe validation error"]
+    B -->|Yes| C["Extract Structured Search Criteria<br/>using configured LLM schema"]
+
+    C --> D{"Criteria schema valid?"}
+    D -->|No| X2["Reject / retry criteria extraction<br/>using existing bounded policy"]
+    D -->|Yes| E["Classify Criteria<br/>Hard requirements<br/>Fact preferences<br/>Semantic requirements + weights"]
+
+    E --> F["Normalize and Select Comparator by Schema<br/>exact / range for IDs, ISO codes, dates, numbers and flags<br/>Levenshtein for comparable text facts<br/>embeddings for Role / Project meaning"]
+
+    %% =============================================================
+    %% Use schema-driven comparison, not hard-coded keyword pairs.
+    %% Normalized Levenshtein similarity = 1 - distance / max length.
+    %% Current versioned threshold is 0.75; recalibrate only with labeled data.
+    %% Missing values never match and PII is not fuzzy-matched.
+    %% =============================================================
+    F --> G["Parameterized Neo4j Hard Filter<br/>exact / range mandatory facts + fuzzy text gates<br/>similarity >= 0.75 for Skill, Organization,<br/>Certification name + issuer, name-only Language,<br/>incomplete Location and other fuzzy-comparable schema facts"]
+    G --> H["Eligible Candidate IDs<br/>stable candidateId ordering"]
+    H --> I{"Any eligible candidates?"}
+
+    I -->|No| R0["Return empty candidate list"]
+    I -->|Yes| J{"Semantic criteria present?"}
+
+    %% =============================================================
+    %% Exact/range facts and accepted Levenshtein scores are [0,1].
+    %% =============================================================
+    I -->|Yes| P1["Score Fact Preferences<br/>exact / range signals + best normalized<br/>Levenshtein similarity per requested fact"]
+    P1 --> P2["Fact preference score per candidate<br/>weighted mean normalized to 0.0 - 1.0"]
+
+    %% =============================================================
+    %% Semantic retrieval uses the same model as stored embeddings.
+    %% =============================================================
+    J -->|No| S0["Semantic score unavailable<br/>aggregate fact signals only"]
+    J -->|Yes| K["Create Semantic Feature Embeddings in Batch<br/>same feature templates used by stored Role / Project vectors<br/>same model + dimensions as vector indexes"]
+
+    K --> L{"Embedding model, dimensions<br/>and vector indexes ready?"}
+    L -->|No| X3["Fail search safely<br/>do not silently ignore semantic criteria"]
+    L -->|Yes| M{"Eligible pool within<br/>exact-scoring bound?"}
+
+    %% Exact scoring gives complete threshold evaluation for bounded pools.
+    M -->|Yes| N["Traverse eligible Candidates to<br/>Role and Project nodes"]
+    N --> O["Exact cosine similarity<br/>for compatible stored embeddings"]
+
+    %% ANN is the scalable candidate-generation path for large pools.
+    M -->|No| Q["Vector-index ANN retrieval<br/>Role and Project topK with configured over-fetch"]
+    Q --> T["Traverse matched Role / Project nodes to Candidate<br/>and intersect with eligible Candidate IDs"]
+    T --> U["Exact cosine re-score<br/>retrieved compatible embeddings"]
+
+    O --> V["Per candidate + semantic criterion<br/>take MAX node score<br/>prevents many-node score inflation"]
+    U --> V
+
+    V --> W["Semantic score per candidate<br/>weighted mean across criteria<br/>missing criterion match contributes 0"]
+
+    %% =============================================================
+    %% Only computed fact and semantic signals control inclusion.
+    %% =============================================================
+    W --> Y["Aggregate available signals<br/>finalScore = normalized weighted mean<br/>semanticScore + factPreferenceScore"]
+    S0 --> Y
+    P2 --> Y
+
+    Y --> Z{"finalScore >= scoreThreshold?"}
+    Z -->|No| X4["Exclude candidate"]
+    Z -->|Yes| AA["Include candidate<br/>candidateId + finalScore + bounded match summary"]
+
+    AA --> AB["Sort deterministically<br/>finalScore DESC, candidateId ASC"]
+    AB --> AC["Apply resultLimit"]
+    AC --> R1["Return qualifying candidates"]
+
+    %% Optional explanations are downstream and never change finalScore.
+    R1 -.-> OPT["Optional explanation generation<br/>non-authoritative and post-scoring"]
